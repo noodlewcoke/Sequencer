@@ -64,6 +64,9 @@ class sequencer:
                         x +=1
                     elif x==-1:
                         break
+        # plt.axis('off')
+        plt.ylabel('Depth of Sequence')
+        plt.xlabel('timestep')
         plt.show()
         pass
 
@@ -106,7 +109,8 @@ class sequencer:
 
 
 if __name__ == '__main__':
-    sequence = sequencer(sequence_lengths=[3,5], enable_plot=True)
-    seq = sequence.limited_sequence(10,[10,10,10])
+    sequence = sequencer(sequence_lengths=[5], enable_plot=True)
+    seq = sequence.limited_sequence(10,[10,10,10,2,2])
+    print(len(seq))
     # sequence.plot_sequences()
     sequence.sequence_map()
