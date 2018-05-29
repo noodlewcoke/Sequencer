@@ -1,16 +1,19 @@
 import numpy as np 
 from sympy.utilities.iterables import variations
 import itertools
+import torch
+from torchvision import datasets, transforms
 from random import shuffle
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+import matplotlib.gridspec as gridspec
 
 #TODO: Exceptions :: sequence_lengths != 0 or [2,2]
 #TODO: Sequence types: entropy, advancing, combination
 #TODO: Discontiguous sequences
 #TODO: Make fontsize in rectangles 'adaptive'
 #TODO: ID sequences and plot the sequence, its color and its ID under MAP
-
+#TODO: Test create_dataset function and 
 class sequencer:
 
     def __init__(self, sequence_lengths=[1], enable_plot=False, diversity=None, discontiguity_lenghts=0):
@@ -22,7 +25,7 @@ class sequencer:
 
     def limited_sequence(self, num_labels, upper_bounds):
         self.depth = len(upper_bounds)
-        
+        self.num_labels = num_labels
         self.sequence_bank = {t:[] for t in range(self.depth)}
         self.unseq = np.arange(num_labels)
         sequences = []
@@ -41,11 +44,11 @@ class sequencer:
         self.unseq = sum([list(a) for a in self.unseq], [])
         return self.unseq
 
-    def sequence_map(self, height=1, show_seq_name=False):
+    def sequence_map(self, height=0.1, show_seq_name=False):
         str_full = ''.join([str(i) for i in self.unseq])
         maxX = len(str_full)
         maxY = self.depth*height
-        plt.figure(figsize=(maxX, maxY))
+        plt.figure(figsize=(maxX, maxY), frameon=False)
         plt.xlim(0, maxX); plt.ylim(0,maxY)
         fig, ax = plt.gcf(), plt.gca()
         x_pos = [0 for i in range(self.depth)]
@@ -67,8 +70,8 @@ class sequencer:
         # plt.axis('off')
         plt.ylabel('Depth of Sequence')
         plt.xlabel('timestep')
+        # plt.savefig('Saved/map.png')
         plt.show()
-        pass
 
     def plot_sequences(self): #Not a good idea to take 
         if self.enable_plot:
@@ -103,14 +106,66 @@ class sequencer:
         print("Please re-run sequence function, then apply sequencer::plot_sequences().")
 
 
-    def create_dataset(self, data, label_dim, save=None):
-        pass
+    def create_dataset(self, data, label, reuse_data=True, save=None):
+        self.traverser = [0 for i in range(self.num_labels)]
+        self.length = len(data)
+        new_dataset = []
+        for i in self.unseq:
+            t = self.traverser[i]
+            while True:
+                d = data[t%self.length]
+                if label[t%self.length]==i:
+                    new_dataset.append(d)
+                    # if t+1==len(data):
+                    #     self.traverser[i] = 0
+                    # else:
+                    self.traverser[i] = t+1
+                    break
+                else:
+                    if t+1==len(data):
+                        if self.traverser[i]==0:
+                            print("WARNING: Sequence does not contain label {}".format(self.traverser[i]))
+                            break
+                        # t=0
+                    t+=1
+                    # else:
+                    #     t+=1
+        if isinstance(save, str):
+            np.load(save)
+        return np.array(new_dataset)
 
+def plot(samples):
+    fig = plt.figure(figsize=(1,5))
+    gs = gridspec.GridSpec(1,5)
+    gs.update(wspace=0.05, hspace=0.05)
 
+    for i, sample in enumerate(samples):
+        ax = plt.subplot(gs[i])
+        plt.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_aspect('equal')
+        plt.imshow(sample.reshape(28,28), cmap='Greys_r')
+
+    return fig
 
 if __name__ == '__main__':
     sequence = sequencer(sequence_lengths=[5], enable_plot=True)
-    seq = sequence.limited_sequence(10,[10,10,10,2,2])
+    seq = sequence.limited_sequence(10,[10,10,10, 10])
     print(len(seq))
     # sequence.plot_sequences()
     sequence.sequence_map()
+    data = []
+    train_loader = torch.utils.data.DataLoader(datasets.MNIST('../data', train=True, download=True, transform=transforms.Compose([transforms.ToTensor()])), batch_size=60000)
+    # for i in train_loader:
+    #     n = tuple([j.numpy() for j in i])
+    #     # data.append(n)
+    #     break
+    data = [i.numpy() for i in next(iter(train_loader))]
+    data, label = data
+    # print(type(label[0]))
+    seq_data = sequence.create_dataset(data=data, label=label, save='Saved/dataset')
+    # print(seq_data.shape)
+    # print(seq[50:55])
+    # fig = plot(seq_data[50:55])
+    # plt.show()
